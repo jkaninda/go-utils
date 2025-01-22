@@ -1,12 +1,95 @@
 package goutils
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 const testFolder = "tests"
+
+func TestConvertBytes(t *testing.T) {
+	byteSizes := []uint64{
+		512,
+		1024,
+		2048,
+		1024 * 1024,
+		1024 * 1024 * 1024,
+		1024 * 1024 * 1024 * 1024,
+		1024 * 1024 * 1024 * 1024 * 1024,
+		1024 * 1024 * 1024 * 1024 * 1024 * 1024,
+	}
+
+	for _, size := range byteSizes {
+		fmt.Printf("%d Bytes -> %s\n", size, ConvertBytes(size))
+	}
+}
+
+func TestConvertToBytes(t *testing.T) {
+	byteSizes := []string{
+		"1KB", "1MB", "1GB", "1Ki", "1Mi", "1Gi", "1TB", "1PB", "1EB",
+	}
+
+	for _, size := range byteSizes {
+		bytes, err := ConvertToBytes(size)
+		if err != nil {
+			t.Errorf("Error converting %s to bytes: %v", size, err)
+		}
+		fmt.Printf("%s -> %d bytes\n", size, bytes)
+	}
+}
+func TestValidateIPAddress(t *testing.T) {
+	tests := []string{
+		"192.168.1.100",
+		"192.168.1.120",
+	}
+	for _, test := range tests {
+		if IsIPAddress(test) {
+			fmt.Println("Ip is valid")
+		} else {
+			fmt.Println("Ip is invalid")
+		}
+	}
+
+}
+func TestValidateIPOrCIDR(t *testing.T) {
+	tests := []string{
+		"192.168.1.100",
+		"192.168.1.100",
+		"192.168.1.100/32",
+		"invalid-input",
+		"192.168.1.100/33",
+	}
+	for _, test := range tests {
+		isIP, isCIDR := IsIPOrCIDR(test)
+		if isIP {
+			fmt.Printf("%s is an IP address\n", test)
+		} else if isCIDR {
+			fmt.Printf("%s is a CIDR\n", test)
+		} else {
+			fmt.Printf("%s is neither an IP address nor a CIDR\n", test)
+		}
+	}
+
+}
+func TestFormatDuration(t *testing.T) {
+	now := time.Now()
+	time.Sleep(2 * time.Second)
+	duration := time.Since(now)
+	fmt.Println(FormatDuration(duration, 2))
+
+}
+
+func TestParseDuration(t *testing.T) {
+	durationStr := "2s"
+	duration, err := ParseDuration(durationStr)
+	if err != nil {
+		t.Errorf("Error parsing duration: %v", err)
+	}
+	fmt.Println(duration)
+}
 
 func TestParseStringRange(t *testing.T) {
 	tests := []struct {
@@ -91,4 +174,87 @@ func TestSlug(t *testing.T) {
 			t.Errorf("Expected %s, got %s", test.output, output)
 		}
 	}
+}
+
+func TestDeepCopy(t *testing.T) {
+	type Source struct {
+		Name  string
+		Age   int
+		Email string
+	}
+
+	type Destination struct {
+		Name  string
+		Age   int
+		Email string
+	}
+	src := Source{Name: "John", Age: 30, Email: "john@example.com"}
+	dest := Destination{}
+
+	err := DeepCopy(&dest, src)
+	if err != nil {
+		t.Errorf("Error copying struct: %v", err)
+	} else {
+		fmt.Printf("Destination: %+v\n", dest)
+	}
+
+}
+
+func TestDeepCopyBetween(t *testing.T) {
+	type Source struct {
+		Name string
+		Age  int
+	}
+
+	type Destination struct {
+		Name  string
+		Email string
+	}
+
+	src := Source{Name: "Bob", Age: 30}
+	dest := Destination{Email: "bob@example.com"}
+
+	err := DeepCopy(&dest, src)
+	if err != nil {
+		fmt.Println("Error:", err)
+	} else {
+		fmt.Printf("Destination: %+v\n", dest)
+	}
+}
+func TestCopyNested(t *testing.T) {
+	type Address struct {
+		City  string
+		State string
+	}
+
+	type Source struct {
+		Name    string
+		Age     int
+		Address Address
+	}
+
+	type Destination struct {
+		Name    string
+		Age     int
+		Address Address
+	}
+
+	src := Source{
+		Name: "Bennett",
+		Age:  30,
+		Address: Address{
+			City:  "New York",
+			State: "NY",
+		},
+	}
+
+	dest := Destination{}
+
+	err := DeepCopy(&dest, src)
+	if err != nil {
+		t.Errorf("Error copying struct: %v", err)
+	} else {
+		fmt.Printf("Destination: %+v\n", dest)
+	}
+	// Output: Destination: {Name:Dave Age:40 Address:{City:New York State:NY}}
 }
