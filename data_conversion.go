@@ -19,23 +19,23 @@ func ConvertBytes(bytes uint64) string {
 
 	switch {
 	case bytes >= EiB:
-		return fmt.Sprintf("%.2f EiB", float64(bytes)/float64(EiB))
+		return fmt.Sprintf("%.2f EB", float64(bytes)/float64(EiB))
 	case bytes >= PiB:
-		return fmt.Sprintf("%.2f PiB", float64(bytes)/float64(PiB))
+		return fmt.Sprintf("%.2f PB", float64(bytes)/float64(PiB))
 	case bytes >= TiB:
-		return fmt.Sprintf("%.2f TiB", float64(bytes)/float64(TiB))
+		return fmt.Sprintf("%.2f TB", float64(bytes)/float64(TiB))
 	case bytes >= GiB:
-		return fmt.Sprintf("%.2f GiB", float64(bytes)/float64(GiB))
+		return fmt.Sprintf("%.2f GB", float64(bytes)/float64(GiB))
 	case bytes >= MiB:
-		return fmt.Sprintf("%.2f MiB", float64(bytes)/float64(MiB))
+		return fmt.Sprintf("%.2f MB", float64(bytes)/float64(MiB))
 	case bytes >= KiB:
-		return fmt.Sprintf("%.2f KiB", float64(bytes)/float64(KiB))
+		return fmt.Sprintf("%.2f KB", float64(bytes)/float64(KiB))
 	default:
-		return fmt.Sprintf("%d bytes", bytes)
+		return fmt.Sprintf("%d Bytes", bytes)
 	}
 }
 
-// ConvertToBytes converts a string with a size suffix (e.g., "1M", "1Mi") to bytes.
+// ConvertToBytes converts a string with a size suffix (e.g., "1M", "1Mi", "1MB") to bytes.
 func ConvertToBytes(input string) (int64, error) {
 	// Define the mapping for binary (Mi) and decimal (M) units
 	binaryUnits := map[string]int64{
@@ -47,12 +47,18 @@ func ConvertToBytes(input string) (int64, error) {
 		"Ei": 1024 * 1024 * 1024 * 1024 * 1024 * 1024,
 	}
 	decimalUnits := map[string]int64{
-		"K": 1000,
-		"M": 1000 * 1000,
-		"G": 1000 * 1000 * 1000,
-		"T": 1000 * 1000 * 1000 * 1000,
-		"P": 1000 * 1000 * 1000 * 1000 * 1000,
-		"E": 1000 * 1000 * 1000 * 1000 * 1000 * 1000,
+		"K":  1000,
+		"KB": 1000,
+		"M":  1000 * 1000,
+		"MB": 1000 * 1000,
+		"G":  1000 * 1000 * 1000,
+		"GB": 1000 * 1000 * 1000,
+		"T":  1000 * 1000 * 1000 * 1000,
+		"TB": 1000 * 1000 * 1000 * 1000,
+		"P":  1000 * 1000 * 1000 * 1000 * 1000,
+		"PB": 1000 * 1000 * 1000 * 1000 * 1000,
+		"E":  1000 * 1000 * 1000 * 1000 * 1000 * 1000,
+		"EB": 1000 * 1000 * 1000 * 1000 * 1000 * 1000,
 	}
 
 	// Extract the numeric part and the unit

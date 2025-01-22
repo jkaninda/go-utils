@@ -250,7 +250,7 @@ go get github.com/jkaninda/go-utils
   ```
 
 #### `ConvertToBytes(input string) (int64, error)`
-- **Purpose**: Converts a string with a size suffix (e.g., "1M", "1Mi") to bytes.
+- **Purpose**: Converts a string with a size suffix (e.g., "1M", "1Mi", "1MB") to bytes.
 - **Parameters**:
     - `input`: The string to convert.
 - **Returns**: The byte size or an error if the input is invalid.

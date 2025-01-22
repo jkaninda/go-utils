@@ -18,18 +18,13 @@ func TestConvertBytes(t *testing.T) {
 	}
 
 	for _, size := range byteSizes {
-		fmt.Printf("%d bytes -> %s\n", size, ConvertBytes(size))
+		fmt.Printf("%d Bytes -> %s\n", size, ConvertBytes(size))
 	}
 }
 
 func TestConvertToBytes(t *testing.T) {
 	byteSizes := []string{
-		"1Ki",
-		"1Mi",
-		"1Gi",
-		"1Ti",
-		"1Pi",
-		"1Ei",
+		"1KB", "1MB", "1GB", "1Ki", "1Mi", "1Gi", "1TB", "1PB", "1EB",
 	}
 
 	for _, size := range byteSizes {
