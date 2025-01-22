@@ -159,7 +159,7 @@ func FormatDuration(d time.Duration, decimalCount int) string {
 		return fmt.Sprintf("%dns", d.Nanoseconds())
 	case d < time.Second:
 		// Format as milliseconds
-		return fmt.Sprintf(format, float64(d.Milliseconds()), "ms")
+		return fmt.Sprintf(format, float64(d.Microseconds())/1000, "ms")
 	case d < time.Minute:
 		// Format as seconds
 		return fmt.Sprintf(format, d.Seconds(), "s")
