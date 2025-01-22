@@ -175,3 +175,86 @@ func TestSlug(t *testing.T) {
 		}
 	}
 }
+
+func TestDeepCopy(t *testing.T) {
+	type Source struct {
+		Name  string
+		Age   int
+		Email string
+	}
+
+	type Destination struct {
+		Name  string
+		Age   int
+		Email string
+	}
+	src := Source{Name: "John", Age: 30, Email: "john@example.com"}
+	dest := Destination{}
+
+	err := DeepCopy(&dest, src)
+	if err != nil {
+		t.Errorf("Error copying struct: %v", err)
+	} else {
+		fmt.Printf("Destination: %+v\n", dest)
+	}
+
+}
+
+func TestDeepCopyBetween(t *testing.T) {
+	type Source struct {
+		Name string
+		Age  int
+	}
+
+	type Destination struct {
+		Name  string
+		Email string
+	}
+
+	src := Source{Name: "Bob", Age: 30}
+	dest := Destination{Email: "bob@example.com"}
+
+	err := DeepCopy(&dest, src)
+	if err != nil {
+		fmt.Println("Error:", err)
+	} else {
+		fmt.Printf("Destination: %+v\n", dest)
+	}
+}
+func TestCopyNested(t *testing.T) {
+	type Address struct {
+		City  string
+		State string
+	}
+
+	type Source struct {
+		Name    string
+		Age     int
+		Address Address
+	}
+
+	type Destination struct {
+		Name    string
+		Age     int
+		Address Address
+	}
+
+	src := Source{
+		Name: "Bennett",
+		Age:  30,
+		Address: Address{
+			City:  "New York",
+			State: "NY",
+		},
+	}
+
+	dest := Destination{}
+
+	err := DeepCopy(&dest, src)
+	if err != nil {
+		t.Errorf("Error copying struct: %v", err)
+	} else {
+		fmt.Printf("Destination: %+v\n", dest)
+	}
+	// Output: Destination: {Name:Dave Age:40 Address:{City:New York State:NY}}
+}

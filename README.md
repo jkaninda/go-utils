@@ -10,233 +10,171 @@ To install the package, run the following command:
 ```bash
 go get github.com/jkaninda/go-utils
 ```
+## Importing
+
+```go
+import "github.com/jkaninda/go-utils"
+```
 
 ## Utility Functions Documentation
 
-### 1. **File and Folder Utilities**
+### 1. **Struct Utility**
 
-#### `FileExists(filename string) bool`
-- **Purpose**: Checks if a file exists at the specified path.
+### Deep Copy Utility
+
+### `DeepCopy(toValue interface{}, fromValue interface{}) error`
+- **Purpose**: Performs a deep copy of the `fromValue` struct (or any value) into the `toValue` struct by marshalling the `fromValue` to JSON and unmarshalling it into the `toValue`. This ensures that nested structs, slices, and maps are also copied deeply.
 - **Parameters**:
-    - `filename`: The path to the file.
-- **Returns**: `true` if the file exists and is not a directory, otherwise `false`.
+  - `toValue`: The destination struct (must be a pointer to a struct) to copy into.
+  - `fromValue`: The source struct (or any value) to copy from.
+- **Returns**: An error if:
+  - The `toValue` is not a pointer to a struct.
+  - JSON marshalling or unmarshalling fails.
 - **Example**:
   ```go
-  exists := FileExists("example.txt")
-  fmt.Println(exists) // Output: true or false
-  ```
+  type Source struct {
+      Name  string
+      Age   int
+      Email string
+  }
 
-#### `FolderExists(name string) bool`
-- **Purpose**: Checks if a folder exists at the specified path.
-- **Parameters**:
-    - `name`: The path to the folder.
-- **Returns**: `true` if the folder exists and is a directory, otherwise `false`.
-- **Example**:
-  ```go
-  exists := FolderExists("example_folder")
-  fmt.Println(exists) // Output: true or false
-  ```
+  type Destination struct {
+      Name  string
+      Age   int
+      Email string
+  }
 
-#### `IsDirEmpty(name string) (bool, error)`
-- **Purpose**: Checks if a directory is empty.
-- **Parameters**:
-    - `name`: The path to the directory.
-- **Returns**: `true` if the directory is empty, otherwise `false`. Returns an error if the directory cannot be accessed.
-- **Example**:
-  ```go
-  isEmpty, err := IsDirEmpty("example_folder")
+  src := Source{Name: "John", Age: 30, Email: "john@example.com"}
+  dest := Destination{}
+
+  err := DeepCopy(&dest, src)
   if err != nil {
       fmt.Println("Error:", err)
   } else {
-      fmt.Println("Is directory empty?", isEmpty)
+      fmt.Printf("Destination: %+v\n", dest)
   }
+  // Output: Destination: {Name:John Age:30 Email:john@example.com}
   ```
 
-#### `CopyFile(src, dst string) error`
-- **Purpose**: Copies a file from the source path to the destination path.
-- **Parameters**:
-    - `src`: The source file path.
-    - `dst`: The destination file path.
-- **Returns**: An error if the operation fails.
-- **Example**:
-  ```go
-  err := CopyFile("source.txt", "destination.txt")
-  if err != nil {
-      fmt.Println("Error:", err)
-  } else {
-      fmt.Println("File copied successfully!")
-  }
-  ```
+### Example Scenarios
 
-#### `ChangePermission(filePath string, mod int) error`
-- **Purpose**: Changes the file permissions of a file.
-- **Parameters**:
-    - `filePath`: The path to the file.
-    - `mod`: The permission mode (e.g., `0644`).
-- **Returns**: An error if the operation fails.
-- **Example**:
-  ```go
-  err := ChangePermission("example.txt", 0644)
-  if err != nil {
-      fmt.Println("Error:", err)
-  }
-  ```
+#### Example 1: Copy Between Structs with Identical Fields
+```go
+type Source struct {
+    Name  string
+    Age   int
+    Email string
+}
 
-#### `WriteToFile(filePath, content string) error`
-- **Purpose**: Writes content to a file at the specified path.
-- **Parameters**:
-    - `filePath`: The path to the file.
-    - `content`: The content to write.
-- **Returns**: An error if the operation fails.
-- **Example**:
-  ```go
-  err := WriteToFile("example.txt", "Hello, world!")
-  if err != nil {
-      fmt.Println("Error:", err)
-  } else {
-      fmt.Println("File written successfully!")
-  }
-  ```
+type Destination struct {
+    Name  string
+    Age   int
+    Email string
+}
+
+src := Source{Name: "Alice", Age: 25, Email: "alice@example.com"}
+dest := Destination{}
+
+err := DeepCopy(&dest, src)
+if err != nil {
+    fmt.Println("Error:", err)
+} else {
+    fmt.Printf("Destination: %+v\n", dest)
+}
+// Output: Destination: {Name:Alice Age:25 Email:alice@example.com}
+```
+
+#### Example 2: Copy Between Structs with Different Fields
+```go
+type Source struct {
+    Name  string
+    Age   int
+}
+
+type Destination struct {
+    Name  string
+    Email string
+}
+
+src := Source{Name: "Bob", Age: 30}
+dest := Destination{Email: "bob@example.com"}
+
+err := DeepCopy(&dest, src)
+if err != nil {
+    fmt.Println("Error:", err)
+} else {
+    fmt.Printf("Destination: %+v\n", dest)
+}
+// Output: Destination: {Name:Bob Email:bob@example.com}
+```
+
+#### Example 3: Copy from Map to Struct
+```go
+src := map[string]interface{}{
+    "Name":  "Charlie",
+    "Age":   35,
+    "Email": "charlie@example.com",
+}
+
+type Destination struct {
+    Name  string
+    Age   int
+    Email string
+}
+
+dest := Destination{}
+
+err := DeepCopy(&dest, src)
+if err != nil {
+    fmt.Println("Error:", err)
+} else {
+    fmt.Printf("Destination: %+v\n", dest)
+}
+// Output: Destination: {Name:Charlie Age:35 Email:charlie@example.com}
+```
+
+#### Example 4: Copy Nested Structs
+```go
+type Address struct {
+    City  string
+    State string
+}
+
+type Source struct {
+    Name    string
+    Age     int
+    Address Address
+}
+
+type Destination struct {
+    Name    string
+    Age     int
+    Address Address
+}
+
+src := Source{
+    Name: "Bennett",
+    Age:  30,
+    Address: Address{
+        City:  "New York",
+        State: "NY",
+    },
+}
+
+dest := Destination{}
+
+err := DeepCopy(&dest, src)
+if err != nil {
+    fmt.Println("Error:", err)
+} else {
+    fmt.Printf("Destination: %+v\n", dest)
+}
+// Output: Destination: {Name:Dave Age:40 Address:{City:New York State:NY}}
+```
 
 ---
 
-### 2. **Environment Variable Utilities**
-
-#### `GetStringEnvWithDefault(key, defaultValue string) string`
-- **Purpose**: Retrieves the value of an environment variable or returns a default value if the variable is not set.
-- **Parameters**:
-    - `key`: The environment variable key.
-    - `defaultValue`: The default value to return if the key is not set.
-- **Returns**: The value of the environment variable or the default value.
-- **Example**:
-  ```go
-  value := GetStringEnvWithDefault("MY_ENV_VAR", "default_value")
-  fmt.Println(value) // Output: The value of MY_ENV_VAR or "default_value"
-  ```
-
-#### `GetIntEnv(key string, defaultValue int) int`
-- **Purpose**: Retrieves the value of an environment variable as an integer or returns a default value if the variable is not set or invalid.
-- **Parameters**:
-    - `key`: The environment variable key.
-    - `defaultValue`: The default value to return if the key is not set or invalid.
-- **Returns**: The integer value of the environment variable or the default value.
-- **Example**:
-  ```go
-  value := GetIntEnv("MY_INT_ENV_VAR", 42)
-  fmt.Println(value) // Output: The value of MY_INT_ENV_VAR or 42
-  ```
-
-#### `GetBoolEnv(key string, defaultValue bool) bool`
-- **Purpose**: Retrieves the value of an environment variable as a boolean or returns a default value if the variable is not set or invalid.
-- **Parameters**:
-    - `key`: The environment variable key.
-    - `defaultValue`: The default value to return if the key is not set or invalid.
-- **Returns**: The boolean value of the environment variable or the default value.
-- **Example**:
-  ```go
-  value := GetBoolEnv("MY_BOOL_ENV_VAR", true)
-  fmt.Println(value) // Output: The value of MY_BOOL_ENV_VAR or true
-  ```
-
-#### `SetEnv(name, value string)`
-- **Purpose**: Sets an environment variable.
-- **Parameters**:
-    - `name`: The environment variable name.
-    - `value`: The value to set.
-- **Example**:
-  ```go
-  SetEnv("MY_ENV_VAR", "my_value")
-  ```
-
----
-
-### 3. **String and Data Utilities**
-
-#### `MergeSlices(slice1, slice2 []string) []string`
-- **Purpose**: Merges two slices of strings into one.
-- **Parameters**:
-    - `slice1`: The first slice.
-    - `slice2`: The second slice.
-- **Returns**: A new slice containing all elements from `slice1` and `slice2`.
-- **Example**:
-  ```go
-  result := MergeSlices([]string{"a", "b"}, []string{"c", "d"})
-  fmt.Println(result) // Output: [a b c d]
-  ```
-
-#### `ParseURLPath(urlPath string) string`
-- **Purpose**: Normalizes a URL path by removing duplicate slashes and ensuring it starts with a single slash.
-- **Parameters**:
-    - `urlPath`: The URL path to normalize.
-- **Returns**: The normalized URL path.
-- **Example**:
-  ```go
-  path := ParseURLPath("//example//path//")
-  fmt.Println(path) // Output: /example/path/
-  ```
-
-#### `ParseRoutePath(path, blockedPath string) string`
-
-
-#### `IsJson(s string) bool`
-- **Purpose**: Checks if a string is valid JSON.
-- **Parameters**:
-    - `s`: The string to check.
-- **Returns**: `true` if the string is valid JSON, otherwise `false`.
-- **Example**:
-  ```go
-  valid := IsJson(`{"key": "value"}`)
-  fmt.Println(valid) // Output: true
-  ```
-
-#### `UrlParsePath(uri string) string`
-- **Purpose**: Extracts the path from a URL.
-- **Parameters**:
-    - `uri`: The URL to parse.
-- **Returns**: The path component of the URL.
-- **Example**:
-  ```go
-  path := UrlParsePath("https://example.com/path")
-  fmt.Println(path) // Output: /path
-  ```
-
-#### `HasWhitespace(s string) bool`
-- **Purpose**: Checks if a string contains any whitespace.
-- **Parameters**:
-    - `s`: The string to check.
-- **Returns**: `true` if the string contains whitespace, otherwise `false`.
-- **Example**:
-  ```go
-  hasSpace := HasWhitespace("hello world")
-  fmt.Println(hasSpace) // Output: true
-  ```
-
-#### `Slug(text string) string`
-- **Purpose**: Converts a string into a URL-friendly slug.
-- **Parameters**:
-    - `text`: The string to convert.
-- **Returns**: The slugified string.
-- **Example**:
-  ```go
-  slug := Slug("Hello, World!")
-  fmt.Println(slug) // Output: hello-world
-  ```
-
-#### `TruncateText(text string, limit int) string`
-- **Purpose**: Truncates a string to a specified length and appends "..." if truncated.
-- **Parameters**:
-    - `text`: The string to truncate.
-    - `limit`: The maximum length of the string.
-- **Returns**: The truncated string.
-- **Example**:
-  ```go
-  truncated := TruncateText("This is a long text", 10)
-  fmt.Println(truncated) // Output: This is a...
-  ```
-
----
-
-### 4. **Data Conversion Utilities**
+### 2. **Data Conversion Utilities**
 
 #### `ConvertBytes(bytes uint64) string`
 - **Purpose**: Converts a byte size into a human-readable string (e.g., "1.23 MiB").
@@ -296,7 +234,7 @@ go get github.com/jkaninda/go-utils
 
 ---
 
-### 5. **Time and Duration Utilities**
+### 3. **Time and Duration Utilities**
 
 #### `ParseDuration(durationStr string) (time.Duration, error)`
 - **Purpose**: Parses a duration string (e.g., `"1h30m"`) into a `time.Duration`.
@@ -324,7 +262,7 @@ go get github.com/jkaninda/go-utils
   result := FormatDuration(90*time.Second, 1)
   fmt.Println(result) // Output: 1.5m
   ```
-### 6. **Network Utilities**
+### 4. **Network Utilities**
 
 ### IP and CIDR Validation Utilities
 
@@ -415,5 +353,227 @@ if IsIPAddress(ip) {
     fmt.Println("Invalid IP address")
 }
 ```
+
+---
+### 5. **File and Folder Utilities**
+
+#### `FileExists(filename string) bool`
+- **Purpose**: Checks if a file exists at the specified path.
+- **Parameters**:
+  - `filename`: The path to the file.
+- **Returns**: `true` if the file exists and is not a directory, otherwise `false`.
+- **Example**:
+  ```go
+  exists := FileExists("example.txt")
+  fmt.Println(exists) // Output: true or false
+  ```
+
+#### `FolderExists(name string) bool`
+- **Purpose**: Checks if a folder exists at the specified path.
+- **Parameters**:
+  - `name`: The path to the folder.
+- **Returns**: `true` if the folder exists and is a directory, otherwise `false`.
+- **Example**:
+  ```go
+  exists := FolderExists("example_folder")
+  fmt.Println(exists) // Output: true or false
+  ```
+
+#### `IsDirEmpty(name string) (bool, error)`
+- **Purpose**: Checks if a directory is empty.
+- **Parameters**:
+  - `name`: The path to the directory.
+- **Returns**: `true` if the directory is empty, otherwise `false`. Returns an error if the directory cannot be accessed.
+- **Example**:
+  ```go
+  isEmpty, err := IsDirEmpty("example_folder")
+  if err != nil {
+      fmt.Println("Error:", err)
+  } else {
+      fmt.Println("Is directory empty?", isEmpty)
+  }
+  ```
+
+#### `CopyFile(src, dst string) error`
+- **Purpose**: Copies a file from the source path to the destination path.
+- **Parameters**:
+  - `src`: The source file path.
+  - `dst`: The destination file path.
+- **Returns**: An error if the operation fails.
+- **Example**:
+  ```go
+  err := CopyFile("source.txt", "destination.txt")
+  if err != nil {
+      fmt.Println("Error:", err)
+  } else {
+      fmt.Println("File copied successfully!")
+  }
+  ```
+
+#### `ChangePermission(filePath string, mod int) error`
+- **Purpose**: Changes the file permissions of a file.
+- **Parameters**:
+  - `filePath`: The path to the file.
+  - `mod`: The permission mode (e.g., `0644`).
+- **Returns**: An error if the operation fails.
+- **Example**:
+  ```go
+  err := ChangePermission("example.txt", 0644)
+  if err != nil {
+      fmt.Println("Error:", err)
+  }
+  ```
+
+#### `WriteToFile(filePath, content string) error`
+- **Purpose**: Writes content to a file at the specified path.
+- **Parameters**:
+  - `filePath`: The path to the file.
+  - `content`: The content to write.
+- **Returns**: An error if the operation fails.
+- **Example**:
+  ```go
+  err := WriteToFile("example.txt", "Hello, world!")
+  if err != nil {
+      fmt.Println("Error:", err)
+  } else {
+      fmt.Println("File written successfully!")
+  }
+  ```
+
+---
+
+### 6. **Environment Variable Utilities**
+
+#### `GetStringEnvWithDefault(key, defaultValue string) string`
+- **Purpose**: Retrieves the value of an environment variable or returns a default value if the variable is not set.
+- **Parameters**:
+  - `key`: The environment variable key.
+  - `defaultValue`: The default value to return if the key is not set.
+- **Returns**: The value of the environment variable or the default value.
+- **Example**:
+  ```go
+  value := GetStringEnvWithDefault("MY_ENV_VAR", "default_value")
+  fmt.Println(value) // Output: The value of MY_ENV_VAR or "default_value"
+  ```
+
+#### `GetIntEnv(key string, defaultValue int) int`
+- **Purpose**: Retrieves the value of an environment variable as an integer or returns a default value if the variable is not set or invalid.
+- **Parameters**:
+  - `key`: The environment variable key.
+  - `defaultValue`: The default value to return if the key is not set or invalid.
+- **Returns**: The integer value of the environment variable or the default value.
+- **Example**:
+  ```go
+  value := GetIntEnv("MY_INT_ENV_VAR", 42)
+  fmt.Println(value) // Output: The value of MY_INT_ENV_VAR or 42
+  ```
+
+#### `GetBoolEnv(key string, defaultValue bool) bool`
+- **Purpose**: Retrieves the value of an environment variable as a boolean or returns a default value if the variable is not set or invalid.
+- **Parameters**:
+  - `key`: The environment variable key.
+  - `defaultValue`: The default value to return if the key is not set or invalid.
+- **Returns**: The boolean value of the environment variable or the default value.
+- **Example**:
+  ```go
+  value := GetBoolEnv("MY_BOOL_ENV_VAR", true)
+  fmt.Println(value) // Output: The value of MY_BOOL_ENV_VAR or true
+  ```
+
+#### `SetEnv(name, value string)`
+- **Purpose**: Sets an environment variable.
+- **Parameters**:
+  - `name`: The environment variable name.
+  - `value`: The value to set.
+- **Example**:
+  ```go
+  SetEnv("MY_ENV_VAR", "my_value")
+  ```
+
+---
+
+### 7. **String and Data Utilities**
+
+#### `MergeSlices(slice1, slice2 []string) []string`
+- **Purpose**: Merges two slices of strings into one.
+- **Parameters**:
+  - `slice1`: The first slice.
+  - `slice2`: The second slice.
+- **Returns**: A new slice containing all elements from `slice1` and `slice2`.
+- **Example**:
+  ```go
+  result := MergeSlices([]string{"a", "b"}, []string{"c", "d"})
+  fmt.Println(result) // Output: [a b c d]
+  ```
+
+#### `ParseURLPath(urlPath string) string`
+- **Purpose**: Normalizes a URL path by removing duplicate slashes and ensuring it starts with a single slash.
+- **Parameters**:
+  - `urlPath`: The URL path to normalize.
+- **Returns**: The normalized URL path.
+- **Example**:
+  ```go
+  path := ParseURLPath("//example//path//")
+  fmt.Println(path) // Output: /example/path/
+  ```
+
+#### `ParseRoutePath(path, blockedPath string) string`
+
+
+#### `IsJson(s string) bool`
+- **Purpose**: Checks if a string is valid JSON.
+- **Parameters**:
+  - `s`: The string to check.
+- **Returns**: `true` if the string is valid JSON, otherwise `false`.
+- **Example**:
+  ```go
+  valid := IsJson(`{"key": "value"}`)
+  fmt.Println(valid) // Output: true
+  ```
+
+#### `UrlParsePath(uri string) string`
+- **Purpose**: Extracts the path from a URL.
+- **Parameters**:
+  - `uri`: The URL to parse.
+- **Returns**: The path component of the URL.
+- **Example**:
+  ```go
+  path := UrlParsePath("https://example.com/path")
+  fmt.Println(path) // Output: /path
+  ```
+
+#### `HasWhitespace(s string) bool`
+- **Purpose**: Checks if a string contains any whitespace.
+- **Parameters**:
+  - `s`: The string to check.
+- **Returns**: `true` if the string contains whitespace, otherwise `false`.
+- **Example**:
+  ```go
+  hasSpace := HasWhitespace("hello world")
+  fmt.Println(hasSpace) // Output: true
+  ```
+
+#### `Slug(text string) string`
+- **Purpose**: Converts a string into a URL-friendly slug.
+- **Parameters**:
+  - `text`: The string to convert.
+- **Returns**: The slugified string.
+- **Example**:
+  ```go
+  slug := Slug("Hello, World!")
+  fmt.Println(slug) // Output: hello-world
+  ```
+
+#### `TruncateText(text string, limit int) string`
+- **Purpose**: Truncates a string to a specified length and appends "..." if truncated.
+- **Parameters**:
+  - `text`: The string to truncate.
+  - `limit`: The maximum length of the string.
+- **Returns**: The truncated string.
+- **Example**:
+  ```go
+  truncated := TruncateText("This is a long text", 10)
+  fmt.Println(truncated) // Output: This is a...
+  ```
 
 ---

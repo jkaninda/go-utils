@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -470,5 +471,27 @@ func WriteToFile(filePath, content string) error {
 	if err != nil {
 		return fmt.Errorf("failed to write to file %s: %w", filePath, err)
 	}
+	return nil
+}
+
+// DeepCopy copies the fromValue struct to the toValue struct by marshalling and unmarshalling the data.
+func DeepCopy(toValue interface{}, fromValue interface{}) error {
+	// Ensure toValue is a pointer to a struct
+	val := reflect.ValueOf(toValue)
+	if val.Kind() != reflect.Ptr || val.Elem().Kind() != reflect.Struct {
+		return fmt.Errorf("toValue must be a pointer to a struct")
+	}
+
+	// Marshal the fromValue to JSON, then unmarshal into the toValue
+	data, err := json.Marshal(fromValue)
+	if err != nil {
+		return fmt.Errorf("failed to marshal fromValue: %v", err)
+	}
+
+	err = json.Unmarshal(data, toValue)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal to toValue struct: %v", err)
+	}
+
 	return nil
 }
