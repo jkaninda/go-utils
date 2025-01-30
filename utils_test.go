@@ -29,7 +29,7 @@ func TestConvertBytes(t *testing.T) {
 
 func TestConvertToBytes(t *testing.T) {
 	byteSizes := []string{
-		"1KB", "1MB", "1GB", "1Ki", "1Mi", "1Gi", "1TB", "1PB", "1EB",
+		"1KB", "1MB", "1GB", "1Ki", "125MiB", "1Mi", "1Gi", "1TB", "1PB", "1EB",
 	}
 
 	for _, size := range byteSizes {
