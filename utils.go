@@ -2,6 +2,7 @@ package goutils
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -13,6 +14,25 @@ import (
 	"strconv"
 	"strings"
 	"time"
+)
+
+var (
+	binaryUnits = map[string]int64{
+		"Ki": 1024, "KiB": 1024,
+		"Mi": 1024 * 1024, "MiB": 1024 * 1024,
+		"Gi": 1024 * 1024 * 1024, "GiB": 1024 * 1024 * 1024,
+		"Ti": 1024 * 1024 * 1024 * 1024, "TiB": 1024 * 1024 * 1024 * 1024,
+		"Pi": 1024 * 1024 * 1024 * 1024 * 1024, "PiB": 1024 * 1024 * 1024 * 1024 * 1024,
+		"Ei": 1024 * 1024 * 1024 * 1024 * 1024 * 1024, "EiB": 1024 * 1024 * 1024 * 1024 * 1024 * 1024,
+	}
+	decimalUnits = map[string]int64{
+		"K": 1000, "KB": 1000,
+		"M": 1000 * 1000, "MB": 1000 * 1000,
+		"G": 1000 * 1000 * 1000, "GB": 1000 * 1000 * 1000,
+		"T": 1000 * 1000 * 1000 * 1000, "TB": 1000 * 1000 * 1000 * 1000,
+		"P": 1000 * 1000 * 1000 * 1000 * 1000, "PB": 1000 * 1000 * 1000 * 1000 * 1000,
+		"E": 1000 * 1000 * 1000 * 1000 * 1000 * 1000, "EB": 1000 * 1000 * 1000 * 1000 * 1000 * 1000,
+	}
 )
 
 // ConvertBytes converts bytes to a human-readable string with the appropriate unit (bytes, MiB, GiB, TiB, PiB, or EiB).
@@ -44,80 +64,49 @@ func ConvertBytes(bytes uint64) string {
 	}
 }
 
-// ConvertToBytes converts a string with a size suffix (e.g., "1M", "1Mi", "1MB") to bytes.
+// ConvertToBytes converts a string with a size suffix (e.g., "1M", "1Mi", "1MiB", "1MB") to bytes.
 func ConvertToBytes(input string) (int64, error) {
-	// Define the mapping for binary (Mi) and decimal (M) units
-	binaryUnits := map[string]int64{
-		"Ki": 1024,
-		"Mi": 1024 * 1024,
-		"Gi": 1024 * 1024 * 1024,
-		"Ti": 1024 * 1024 * 1024 * 1024,
-		"Pi": 1024 * 1024 * 1024 * 1024 * 1024,
-		"Ei": 1024 * 1024 * 1024 * 1024 * 1024 * 1024,
-	}
-	decimalUnits := map[string]int64{
-		"K":  1000,
-		"KB": 1000,
-		"M":  1000 * 1000,
-		"MB": 1000 * 1000,
-		"G":  1000 * 1000 * 1000,
-		"GB": 1000 * 1000 * 1000,
-		"T":  1000 * 1000 * 1000 * 1000,
-		"TB": 1000 * 1000 * 1000 * 1000,
-		"P":  1000 * 1000 * 1000 * 1000 * 1000,
-		"PB": 1000 * 1000 * 1000 * 1000 * 1000,
-		"E":  1000 * 1000 * 1000 * 1000 * 1000 * 1000,
-		"EB": 1000 * 1000 * 1000 * 1000 * 1000 * 1000,
+	if input == "" {
+		return 0, errors.New("input cannot be empty")
 	}
 
-	// Extract the numeric part and the unit
-	var numberPart string
-	var unitPart string
-
-	for i, r := range input {
-		if r < '0' || r > '9' {
-			numberPart = input[:i]
-			unitPart = input[i:]
-			break
-		}
+	numPart, unitPart := splitNumberAndUnit(input)
+	if numPart == "" || unitPart == "" {
+		return 0, errors.New("invalid format: missing number or unit")
 	}
 
-	// Handle case where no valid unit is found
-	if unitPart == "" {
-		return 0, fmt.Errorf("invalid format: no unit provided")
-	}
-
-	// Convert the numeric part to an integer
-	value, err := strconv.ParseInt(numberPart, 10, 64)
+	value, err := strconv.ParseInt(numPart, 10, 64)
 	if err != nil {
 		return 0, fmt.Errorf("invalid number format: %w", err)
 	}
 
-	// Determine the multiplier
-	var multiplier int64
-	if strings.HasSuffix(unitPart, "i") {
-		// Binary units
-		multiplier, err = findMultiplier(unitPart, binaryUnits)
-	} else {
-		// Decimal units
-		multiplier, err = findMultiplier(unitPart, decimalUnits)
-	}
-
+	multiplier, err := findMultiplier(unitPart)
 	if err != nil {
 		return 0, err
 	}
 
-	// Calculate the bytes
 	return value * multiplier, nil
 }
 
-// Helper function to find the multiplier for a given unit
-func findMultiplier(unit string, units map[string]int64) (int64, error) {
-	multiplier, ok := units[unit]
-	if !ok {
-		return 0, fmt.Errorf("invalid unit: %s", unit)
+// splitNumberAndUnit extracts the numeric part and the unit from the input string.
+func splitNumberAndUnit(input string) (string, string) {
+	for i, r := range input {
+		if r < '0' || r > '9' {
+			return input[:i], input[i:]
+		}
 	}
-	return multiplier, nil
+	return input, ""
+}
+
+// findMultiplier determines the correct multiplier based on the unit.
+func findMultiplier(unit string) (int64, error) {
+	if m, exists := binaryUnits[unit]; exists {
+		return m, nil
+	}
+	if m, exists := decimalUnits[unit]; exists {
+		return m, nil
+	}
+	return 0, fmt.Errorf("invalid unit: %s", unit)
 }
 
 // IsCIDR checks if the input is a valid CIDR notation
