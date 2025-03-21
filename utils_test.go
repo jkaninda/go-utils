@@ -258,3 +258,18 @@ func TestCopyNested(t *testing.T) {
 	}
 	// Output: Destination: {Name:Dave Age:40 Address:{City:New York State:NY}}
 }
+
+func TestBase64Encode(t *testing.T) {
+	input := "Hello, World!"
+	output := Base64Encode(input)
+	fmt.Println(output)
+}
+
+func TestBase64Decode(t *testing.T) {
+	input := "SGVsbG8sIFdvcmxkIQ=="
+	output, err := Base64Decode(input)
+	if err != nil {
+		t.Errorf("Error decoding base64: %v", err)
+	}
+	fmt.Println(output)
+}
