@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -272,4 +273,117 @@ func TestBase64Decode(t *testing.T) {
 		t.Errorf("Error decoding base64: %v", err)
 	}
 	fmt.Println(output)
+}
+
+func TestRemoveDuplicates(t *testing.T) {
+	names := []string{"John", "Bob", "Jane", "Bob"}
+	result := RemoveDuplicates(names)
+	if len(result) == len(names) {
+		t.Errorf("Failed to remove duplicates: %v", names)
+	}
+	fmt.Println(result)
+}
+
+func TestIsAValidAddr(t *testing.T) {
+	addr := ":80"
+	if !IsAValidAddr(addr) {
+		t.Errorf("Address should be valid")
+	}
+}
+func TestReplaceEnvVars(t *testing.T) {
+	_ = os.Setenv("TEST_VAR", "Hello")
+	_ = os.Setenv("TEST_VAR2", "World")
+	_ = os.Setenv("TEST_VAR3", "Golang")
+
+	tests := []struct {
+		input  string
+		output string
+	}{
+		{"Hello ${TEST_VAR}", "Hello Hello"},
+		{"${TEST_VAR} ${TEST_VAR2}", "Hello World"},
+		{"${TEST_VAR3} is great", "Golang is great"},
+	}
+
+	for _, test := range tests {
+		result := ReplaceEnvVars(test.input)
+		if result != test.output {
+			t.Errorf("Expected %s, got %s", test.output, result)
+		}
+	}
+	_ = os.Unsetenv("TEST_VAR")
+	_ = os.Unsetenv("TEST_VAR2")
+	_ = os.Unsetenv("TEST_VAR3")
+}
+
+func TestIsBase64(t *testing.T) {
+	tests := []struct {
+		input  string
+		output bool
+	}{
+		{"SGVsbG8sIFdvcmxkIQ==", true},
+		{"InvalidBase64String", false},
+		{"", false},
+	}
+
+	for _, test := range tests {
+		result := IsBase64(test.input)
+		if result != test.output {
+			t.Errorf("Expected %v, got %v for input %s", test.output, result, test.input)
+		}
+	}
+}
+
+func TestNormalizeHTTPMethods(t *testing.T) {
+	methods := []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "TRACE", "CONNECT", "HEAD"}
+	for _, method := range methods {
+		normalized, _ := NormalizeHTTPMethods(method)
+		if normalized[0] != method {
+			t.Errorf("Expected %s, got %s", method, normalized)
+		}
+	}
+
+	// Test with lowercase methods
+	for _, method := range methods {
+		normalized, _ := NormalizeHTTPMethods(strings.ToLower(method))
+		if normalized[0] != strings.ToUpper(method) {
+			t.Errorf("Expected %s, got %s", strings.ToUpper(method), normalized)
+		}
+	}
+}
+func TestHasWhitespace(t *testing.T) {
+	tests := []struct {
+		input  string
+		output bool
+	}{
+		{"Hello World", true},
+		{"NoWhitespace", false},
+		{"   Leading and trailing spaces   ", true},
+		{"\tTab character", true},
+	}
+
+	for _, test := range tests {
+		result := HasWhitespace(test.input)
+		if result != test.output {
+			t.Errorf("Expected %v, got %v for input %s", test.output, result, test.input)
+		}
+	}
+}
+func TestIsJson(t *testing.T) {
+	tests := []struct {
+		input  string
+		output bool
+	}{
+		{`{"name": "John", "age": 30}`, true},
+		{`[1, 2, 3]`, true},
+		{`"Hello, World!"`, true},
+		{`{name: "John", age: 30}`, false}, // Invalid JSON
+		{`Hello, World!`, false},           // Not JSON
+	}
+
+	for _, test := range tests {
+		result := IsJson(test.input)
+		if result != test.output {
+			t.Errorf("Expected %v, got %v for input %s", test.output, result, test.input)
+		}
+	}
 }
