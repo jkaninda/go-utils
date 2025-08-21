@@ -17,7 +17,12 @@ jobs:
         go-version: '1.23.2'
 
     - name: Test
-      run: go test -v ./...
+      run: go test -coverprofile=coverage.txt
 
     - name: Build
       run: go build -v ./...
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        slug: jkaninda/go-utils

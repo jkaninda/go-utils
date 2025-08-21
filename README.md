@@ -4,6 +4,7 @@ A collection of Go utilities for various tasks.
 [![Tests](https://github.com/jkaninda/go-utils/actions/workflows/test.yml/badge.svg)](https://github.com/jkaninda/go-utils/actions/workflows/test.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/jkaninda/go-utils)](https://goreportcard.com/report/github.com/jkaninda/go-utils)
 [![Go Reference](https://pkg.go.dev/badge/github.com/jkaninda/go-utils.svg)](https://pkg.go.dev/github.com/jkaninda/go-utils)
+[![codecov](https://codecov.io/gh/jkaninda/go-utils/graph/badge.svg?token=2ECB5SBIPX)](https://codecov.io/gh/jkaninda/go-utils)
 ## Installation
 
 To install the package, run the following command:

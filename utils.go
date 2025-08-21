@@ -1,6 +1,8 @@
 package goutils
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -8,6 +10,7 @@ import (
 	"io"
 	"io/fs"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"reflect"
@@ -34,6 +37,8 @@ var (
 		"P": 1000 * 1000 * 1000 * 1000 * 1000, "PB": 1000 * 1000 * 1000 * 1000 * 1000,
 		"E": 1000 * 1000 * 1000 * 1000 * 1000 * 1000, "EB": 1000 * 1000 * 1000 * 1000 * 1000 * 1000,
 	}
+	defaultErrorWriter io.Writer = os.Stderr
+	envPattern                   = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}`)
 )
 
 // ConvertBytes converts bytes to a human-readable string with the appropriate unit (bytes, MiB, GiB, TiB, PiB, or EiB).
@@ -135,6 +140,30 @@ func IsIPOrCIDR(input string) (isIP bool, isCIDR bool) {
 // IsIPAddress checks if the input is a valid IP address (IPv4 or IPv6)
 func IsIPAddress(ip string) bool {
 	return net.ParseIP(ip) != nil
+}
+
+// RealIP extracts the real IP address of the client from the HTTP Request.
+func RealIP(r *http.Request) string {
+	// Check the X-Forwarded-For header for the client IP.
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		// Take the first IP in the comma-separated list.
+		if ips := strings.Split(xff, ","); len(ips) > 0 {
+			return strings.TrimSpace(ips[0])
+		}
+	}
+
+	// Check the X-Real-IP header as a fallback.
+	if ip := r.Header.Get("X-Real-IP"); ip != "" {
+		return strings.TrimSpace(ip)
+	}
+
+	// Use the remote address if headers are not set.
+	if ip, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return ip
+	}
+
+	// Return the raw remote address as a last resort.
+	return r.RemoteAddr
 }
 
 // FormatDuration formats the duration to either "X.Xms", "X.Xs", "X.Xm", or "X.Xh"
@@ -498,4 +527,194 @@ func Base64Decode(input string) (string, error) {
 		return "", err
 	}
 	return string(data), nil
+}
+
+// RemoveDuplicates removes duplicate elements from a slice of any comparable type.
+// It preserves the original order of elements, keeping the first occurrence of each duplicate.
+//
+// Type Parameters:
+//   - T: any type that supports equality comparison (comparable constraint)
+//
+// Parameters:
+//   - elements: slice of elements to process
+//
+// Returns:
+//   - []T: new slice with duplicates removed
+func RemoveDuplicates[T comparable](elements []T) []T {
+	encountered := make(map[T]bool)
+	result := make([]T, 0, len(elements))
+
+	for _, elem := range elements {
+		if !encountered[elem] {
+			encountered[elem] = true
+			result = append(result, elem)
+		}
+	}
+
+	return result
+}
+
+// LoadTLSConfig creates a TLS configuration from certificate and key files
+// Parameters:
+//   - certFile: Path to the certificate file (PEM format)
+//   - keyFile: Path to the private key file (PEM format)
+//   - caFile: Optional path to CA certificate file for client verification (set to "" to disable)
+//   - clientAuth: Whether to require client certificate verification
+//
+// Returns:
+//   - *tls.Config configured with the certificate and settings
+//   - error if any occurred during loading
+func LoadTLSConfig(certFile, keyFile, caFile string, clientAuth bool) (*tls.Config, error) {
+	// Load server certificate and key
+	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return nil, err
+	}
+
+	config := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		MinVersion:   tls.VersionTLS12, // Enforce minimum TLS version 1.2
+	}
+
+	// If caFile is provided, set up client certificate verification
+	if caFile != "" {
+		caCert, err := os.ReadFile(caFile)
+		if err != nil {
+			return nil, err
+		}
+
+		caCertPool := x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM(caCert) {
+			_, _ = fmt.Fprintf(defaultErrorWriter, "Warning: failed to append CA certs from PEM")
+		}
+
+		config.ClientCAs = caCertPool
+		if clientAuth {
+			config.ClientAuth = tls.RequireAndVerifyClientCert
+		} else {
+			config.ClientAuth = tls.VerifyClientCertIfGiven
+		}
+	}
+
+	return config, nil
+}
+
+// IsAValidAddr checks if the entrypoint address is valid.
+// A valid entrypoint address should be in the format ":<port>" or "<IP>:<port>",
+// where <IP> is a valid IP address and <port> is a valid port number (1-65535).
+func IsAValidAddr(addr string) bool {
+	// Split the addr into IP and port parts
+	host, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+
+	// If the host is empty, it means the addr is in the format ":<port>"
+	// Otherwise, validate the IP address
+	if host != "" {
+		ip := net.ParseIP(host)
+		if ip == nil {
+			return false
+		}
+	}
+
+	// Convert the port string to an integer
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return false
+	}
+
+	// Check if the port is within the valid range
+	if port < 1 || port > 65535 {
+		return false
+	}
+	return true
+}
+
+// IsValidHTTPMethods checks if all strings in the input slice are valid HTTP methods.
+// The check is case-insensitive (converts to uppercase for comparison), but returns
+// the original invalid methods in the response.
+//
+// Parameters:
+//   - methods: slice of strings to validate
+//
+// Returns:
+//   - bool: true if all methods are valid, false otherwise
+//   - []string: slice of original invalid methods found (empty if all are valid)
+func IsValidHTTPMethods(methods ...string) (bool, []string) {
+	// Standard HTTP methods
+	validMethods := map[string]struct{}{
+		http.MethodGet:     {},
+		http.MethodHead:    {},
+		http.MethodPost:    {},
+		http.MethodPut:     {},
+		http.MethodPatch:   {},
+		http.MethodDelete:  {},
+		http.MethodConnect: {},
+		http.MethodOptions: {},
+		http.MethodTrace:   {},
+	}
+
+	var invalidMethods []string
+
+	for _, method := range methods {
+		upperMethod := strings.ToUpper(method)
+		if _, ok := validMethods[upperMethod]; !ok {
+			invalidMethods = append(invalidMethods, method)
+		}
+	}
+
+	if len(invalidMethods) > 0 {
+		return false, invalidMethods
+	}
+	return true, nil
+}
+
+// NormalizeHTTPMethods converts all methods to uppercase and validates them.
+// Returns the normalized methods if all are valid, or an error if any are invalid.
+//
+// Parameters:
+//   - methods: slice of strings to normalize and validate
+//
+// Returns:
+//   - []string: slice of uppercase methods if all are valid
+//   - error: description of invalid methods if any are found
+func NormalizeHTTPMethods(methods ...string) ([]string, error) {
+	normalized := make([]string, len(methods))
+	valid, invalid := IsValidHTTPMethods(methods...)
+
+	if !valid {
+		return nil, fmt.Errorf("invalid HTTP methods: %v", invalid)
+	}
+
+	for i, method := range methods {
+		normalized[i] = strings.ToUpper(method)
+	}
+
+	return normalized, nil
+}
+
+// ReplaceEnvVars replaces ${VAR} with the environment variable value if present
+// If the variable is not set, it returns the original string unchanged.
+// example: "Hello ${USER}, welcome!" becomes "Hello John, welcome!" if USER is set to
+func ReplaceEnvVars(s string) string {
+	if !envPattern.MatchString(s) {
+		return s
+	}
+	return envPattern.ReplaceAllStringFunc(s, func(match string) string {
+		name := envPattern.FindStringSubmatch(match)[1]
+		if val, ok := os.LookupEnv(name); ok {
+			return val
+		}
+		return match
+	})
+}
+
+// IsBase64 checks if the input is valid Base64-encoded content.
+func IsBase64(input string) bool {
+	if input == "" {
+		return false
+	}
+	_, err := base64.StdEncoding.DecodeString(input)
+	return err == nil
 }
