@@ -290,30 +290,6 @@ func TestIsAValidAddr(t *testing.T) {
 		t.Errorf("Address should be valid")
 	}
 }
-func TestReplaceEnvVars(t *testing.T) {
-	_ = os.Setenv("TEST_VAR", "Hello")
-	_ = os.Setenv("TEST_VAR2", "World")
-	_ = os.Setenv("TEST_VAR3", "Golang")
-
-	tests := []struct {
-		input  string
-		output string
-	}{
-		{"Hello ${TEST_VAR}", "Hello Hello"},
-		{"${TEST_VAR} ${TEST_VAR2}", "Hello World"},
-		{"${TEST_VAR3} is great", "Golang is great"},
-	}
-
-	for _, test := range tests {
-		result := ReplaceEnvVars(test.input)
-		if result != test.output {
-			t.Errorf("Expected %s, got %s", test.output, result)
-		}
-	}
-	_ = os.Unsetenv("TEST_VAR")
-	_ = os.Unsetenv("TEST_VAR2")
-	_ = os.Unsetenv("TEST_VAR3")
-}
 
 func TestIsBase64(t *testing.T) {
 	tests := []struct {
@@ -384,6 +360,101 @@ func TestIsJson(t *testing.T) {
 		result := IsJson(test.input)
 		if result != test.output {
 			t.Errorf("Expected %v, got %v for input %s", test.output, result, test.input)
+		}
+	}
+}
+func TestReplaceEnvVars(t *testing.T) {
+	// Set environment variables for testing
+	err := os.Setenv("TEST_VAR1", "value1")
+	if err != nil {
+		return
+	}
+	err = os.Setenv("TEST_VAR2", "value2")
+	if err != nil {
+		return
+	}
+
+	tests := []struct {
+		input  string
+		output string
+	}{
+		{"This is a ${TEST_VAR1}", "This is a value1"},
+		{"${TEST_VAR2} is here", "value2 is here"},
+		{"No variables here", "No variables here"},
+	}
+	for _, test := range tests {
+		output := ReplaceEnvVars(test.input)
+		if output != test.output {
+			t.Errorf("Expected %s, got %s", test.output, output)
+		}
+	}
+}
+
+func TestEnv(t *testing.T) {
+	// Set environment variables for testing
+	err := SetEnv("EXISTING_VAR", "exists")
+	if err != nil {
+		return
+	}
+	tests := []struct {
+		key          string
+		defaultValue string
+		expected     string
+	}{
+		{"EXISTING_VAR", "default", "exists"},
+		{"NON_EXISTING_VAR", "default", "default"},
+	}
+
+	for _, test := range tests {
+		result := Env(test.key, test.defaultValue)
+		if result != test.expected {
+			t.Errorf("For key %s, expected %s but got %s", test.key, test.expected, result)
+		}
+	}
+}
+func TestEnvInt(t *testing.T) {
+	// Set environment variables for testing
+	err := SetEnv("EXISTING_INT_VAR", "42")
+	if err != nil {
+		return
+	}
+	tests := []struct {
+		key          string
+		defaultValue int
+		expected     int
+	}{
+		{"EXISTING_INT_VAR", 10, 42},
+		{"NON_EXISTING_INT_VAR", 10, 10},
+		{"INVALID_INT_VAR", 20, 20},
+	}
+
+	for _, test := range tests {
+		result := EnvInt(test.key, test.defaultValue)
+		if result != test.expected {
+			t.Errorf("For key %s, expected %d but got %d", test.key, test.expected, result)
+		}
+	}
+}
+func TestEnvBool(t *testing.T) {
+	// Set environment variables for testing
+	err := SetEnv("EXISTING_BOOL_VAR", "true")
+	if err != nil {
+		return
+	}
+	tests := []struct {
+		key          string
+		defaultValue bool
+		expected     bool
+	}{
+		{"EXISTING_BOOL_VAR", false, true},
+		{"NON_EXISTING_BOOL_VAR", true, true},
+		{"INVALID_BOOL_VAR", false, false},
+	}
+
+	for _, test := range tests {
+		result := EnvBool(test.key, test.defaultValue)
+		if result != test.expected {
+			t.Errorf("For key %s, expected %v but got %v", test.key, test.expected, result)
 		}
 	}
 }

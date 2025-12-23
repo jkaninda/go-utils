@@ -1,9 +1,11 @@
 package goutils
 
 import (
+	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -38,7 +40,14 @@ var (
 		"E": 1000 * 1000 * 1000 * 1000 * 1000 * 1000, "EB": 1000 * 1000 * 1000 * 1000 * 1000 * 1000,
 	}
 	defaultErrorWriter io.Writer = os.Stderr
-	envPattern                   = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_]*)\}`)
+	// Matches ${VAR_NAME} or {VAR_NAME}
+	envPattern = regexp.MustCompile(`\$?\{([A-Za-z_][A-Za-z0-9_]*)\}`)
+
+	// Matches {{function()}} or {{function(args)}}
+	funcPattern = regexp.MustCompile(`\{\{([A-Za-z_][A-Za-z0-9_]*)\(([^)]*)\)\}\}`)
+	// Extract the numeric part and the unit
+	numberPart string
+	unitPart   string
 )
 
 // ConvertBytes converts bytes to a human-readable string with the appropriate unit (bytes, MiB, GiB, TiB, PiB, or EiB).
@@ -223,6 +232,7 @@ func FolderExists(name string) bool {
 }
 
 // GetStringEnvWithDefault gets the value of an environment variable or returns a default value
+// Deprecated: Use Env instead
 func GetStringEnvWithDefault(key, defaultValue string) string {
 	val := os.Getenv(key)
 	if val == "" {
@@ -232,6 +242,7 @@ func GetStringEnvWithDefault(key, defaultValue string) string {
 }
 
 // GetIntEnv gets the value of an environment variable or returns an empty string
+// Deprecated: Use EnvInt instead
 func GetIntEnv(key string, defaultValue int) int {
 	val := os.Getenv(key)
 	if val == "" {
@@ -248,6 +259,7 @@ func GetIntEnv(key string, defaultValue int) int {
 }
 
 // GetBoolEnv gets the value of an environment variable or returns an empty string
+// Deprecated: Use EnvBool instead
 func GetBoolEnv(key string, defaultValue bool) bool {
 	val := os.Getenv(key)
 	if val == "" {
@@ -262,15 +274,40 @@ func GetBoolEnv(key string, defaultValue bool) bool {
 
 }
 
-// SetEnv Set env
-func SetEnv(name, value string) {
+// SetEnv sets the value of an environment variable if the value is not empty
+func SetEnv(name, value string) error {
 	if len(value) != 0 {
-		err := os.Setenv(name, value)
-		if err != nil {
-			return
+		return os.Setenv(name, value)
+	}
+	return nil
+}
+
+// Env retrieves the value of the environment variable named by the key.
+func Env(envName string, defaultValue string) string {
+	if value, exists := os.LookupEnv(envName); exists {
+		return value
+	}
+	return defaultValue
+}
+
+// EnvInt retrieves the integer value of the environment variable named by the key.
+func EnvInt(envName string, defaultValue int) int {
+	if value, exists := os.LookupEnv(envName); exists {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return intValue
 		}
 	}
+	return defaultValue
+}
 
+// EnvBool retrieves the boolean value of the environment variable named by the key.
+func EnvBool(envName string, defaultValue bool) bool {
+	if value, exists := os.LookupEnv(envName); exists {
+		if boolValue, err := strconv.ParseBool(value); err == nil {
+			return boolValue
+		}
+	}
+	return defaultValue
 }
 
 // MergeSlices merges two slices of strings
@@ -694,20 +731,200 @@ func NormalizeHTTPMethods(methods ...string) ([]string, error) {
 	return normalized, nil
 }
 
-// ReplaceEnvVars replaces ${VAR} with the environment variable value if present
-// If the variable is not set, it returns the original string unchanged.
-// example: "Hello ${USER}, welcome!" becomes "Hello John, welcome!" if USER is set to
+// ReplaceEnvVars replaces environment variables and built-in functions
+// Supports:
+// - ${VAR_NAME} or {VAR_NAME} - environment variables
+// - {{randomString(length)}} - random alphanumeric string
+// - {{randomHex(length)}} - random hex string
+// - {{uuid()}} - UUID v4
+// - {{timestamp()}} - Unix timestamp in seconds
+// - {{timestampMs()}} - Unix timestamp in milliseconds
+// - {{date(format)}} - formatted date (format optional, default: RFC3339)
+// - {{now()}} - current time in RFC3339 format
 func ReplaceEnvVars(s string) string {
+	if s == "" {
+		return s
+	}
+
+	// First, replace function calls
+	s = replaceFunctions(s)
+
+	// Then, replace environment variables
+	s = replaceEnvVariables(s)
+
+	return s
+}
+
+func replaceEnvVariables(s string) string {
 	if !envPattern.MatchString(s) {
 		return s
 	}
+
 	return envPattern.ReplaceAllStringFunc(s, func(match string) string {
-		name := envPattern.FindStringSubmatch(match)[1]
+		submatch := envPattern.FindStringSubmatch(match)
+		if len(submatch) < 2 {
+			return match
+		}
+
+		name := submatch[1]
 		if val, ok := os.LookupEnv(name); ok {
 			return val
 		}
 		return match
 	})
+}
+
+func replaceFunctions(s string) string {
+	if !funcPattern.MatchString(s) {
+		return s
+	}
+
+	return funcPattern.ReplaceAllStringFunc(s, func(match string) string {
+		submatch := funcPattern.FindStringSubmatch(match)
+		if len(submatch) < 2 {
+			return match
+		}
+
+		funcName := submatch[1]
+		args := ""
+		if len(submatch) >= 3 {
+			args = strings.TrimSpace(submatch[2])
+		}
+
+		result, err := executeFunction(funcName, args)
+		if err != nil {
+			return match
+		}
+
+		return result
+	})
+}
+
+func executeFunction(funcName, args string) (string, error) {
+	switch strings.ToLower(funcName) {
+	case "randomstring":
+		length := 32 // default
+		if args != "" {
+			if l, err := strconv.Atoi(args); err == nil && l > 0 && l <= 1024 {
+				length = l
+			} else {
+				return "", fmt.Errorf("invalid length for randomString: %s", args)
+			}
+		}
+		return randomString(length), nil
+
+	case "randomhex":
+		length := 32 // default
+		if args != "" {
+			if l, err := strconv.Atoi(args); err == nil && l > 0 && l <= 1024 {
+				length = l
+			} else {
+				return "", fmt.Errorf("invalid length for randomHex: %s", args)
+			}
+		}
+		return randomHex(length), nil
+
+	case "uuid":
+		return generateUUID(), nil
+
+	case "timestamp":
+		return strconv.FormatInt(time.Now().Unix(), 10), nil
+
+	case "timestampms":
+		return strconv.FormatInt(time.Now().UnixMilli(), 10), nil
+
+	case "now":
+		return time.Now().Format(time.RFC3339), nil
+
+	case "date":
+		format := time.RFC3339 // default
+		if args != "" {
+			format = parseTimeFormat(args)
+		}
+		return time.Now().Format(format), nil
+
+	default:
+		return "", fmt.Errorf("unknown function: %s", funcName)
+	}
+}
+
+// randomString generates a random alphanumeric string of specified length
+func randomString(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, length)
+
+	if _, err := rand.Read(b); err != nil {
+		return ""
+	}
+
+	for i := range b {
+		b[i] = charset[b[i]%byte(len(charset))]
+	}
+
+	return string(b)
+}
+
+// randomHex generates a random hexadecimal string of specified length
+func randomHex(length int) string {
+	bytes := make([]byte, (length+1)/2)
+
+	if _, err := rand.Read(bytes); err != nil {
+		return ""
+	}
+
+	hexStr := hex.EncodeToString(bytes)
+	if len(hexStr) > length {
+		hexStr = hexStr[:length]
+	}
+
+	return hexStr
+}
+
+// generateUUID generates a UUID v4
+func generateUUID() string {
+	uuid := make([]byte, 16)
+
+	if _, err := rand.Read(uuid); err != nil {
+		return ""
+	}
+
+	// Set version (4) and variant bits
+	uuid[6] = (uuid[6] & 0x0f) | 0x40 // Version 4
+	uuid[8] = (uuid[8] & 0x3f) | 0x80 // Variant is 10
+
+	return fmt.Sprintf("%x-%x-%x-%x-%x",
+		uuid[0:4],
+		uuid[4:6],
+		uuid[6:8],
+		uuid[8:10],
+		uuid[10:])
+}
+
+// parseTimeFormat converts common format names to Go time format strings
+func parseTimeFormat(format string) string {
+	// Support common format aliases
+	formats := map[string]string{
+		"rfc3339":     time.RFC3339,
+		"rfc822":      time.RFC822,
+		"iso8601":     time.RFC3339,
+		"unix":        "2006-01-02 15:04:05",
+		"date":        "2006-01-02",
+		"time":        "15:04:05",
+		"datetime":    "2006-01-02 15:04:05",
+		"kitchen":     time.Kitchen,
+		"ansic":       time.ANSIC,
+		"unixdate":    time.UnixDate,
+		"rubydate":    time.RubyDate,
+		"rfc850":      time.RFC850,
+		"rfc1123":     time.RFC1123,
+		"rfc1123z":    time.RFC1123Z,
+		"rfc3339nano": time.RFC3339Nano,
+	}
+
+	if f, ok := formats[strings.ToLower(format)]; ok {
+		return f
+	}
+	return format
 }
 
 // IsBase64 checks if the input is valid Base64-encoded content.
