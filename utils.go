@@ -45,9 +45,6 @@ var (
 
 	// Matches {{function()}} or {{function(args)}}
 	funcPattern = regexp.MustCompile(`\{\{([A-Za-z_][A-Za-z0-9_]*)\(([^)]*)\)\}\}`)
-	// Extract the numeric part and the unit
-	numberPart string
-	unitPart   string
 )
 
 // ConvertBytes converts bytes to a human-readable string with the appropriate unit (bytes, MiB, GiB, TiB, PiB, or EiB).
